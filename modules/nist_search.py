@@ -73,11 +73,12 @@ def FindVars(vuln: dict) -> tuple:
     return CVE_ID, description, severity, severity_score, details_url, exploitability
 
 
-def searchCVE(keyword: str, log, apiKey=None) -> list[Vulnerability]:
-    url = "https://services.nvd.nist.gov/rest/json/cves/1.0?"
+def searchCVE(keyword: str, log, apiKey=None) -> list(Vulnerability):
+    url = "https://services.nvd.nist.gov/rest/json/cves/2.0?"
     if apiKey:
-        sleep_time = 0.1
-        paramaters = {"keyword": keyword, "apiKey": apiKey}
+        sleep_time = 1.7
+        paramaters = {"keyword": keyword}
+        headers = {"apiKey": apiKey}
     else:
         sleep_time = 8
         paramaters = {"keyword": keyword}
@@ -88,7 +89,7 @@ def searchCVE(keyword: str, log, apiKey=None) -> list[Vulnerability]:
     for tries in range(3):
         try:
             sleep(sleep_time)
-            request = get(url, params=paramaters)
+            request = get(url, headers=headers, params=paramaters)
             data = request.json()
         except Exception as e:
             if request.status_code == 403:

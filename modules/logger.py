@@ -9,9 +9,9 @@ from modules.utils import get_terminal_width
 def banner(msg, color, console) -> None:
     term_width = get_terminal_width()
 
-    console.print("─" * term_width, style=color)
-    console.print(Text(msg), justify="center", style=color)
-    console.print("─" * term_width, style=color)
+    need rework console.print("─" * term_width, style=color)
+    need rework console.print(Text(msg), justify="center", style=color)
+    need rework console.print("─" * term_width, style=color)
 
 
 class Logger:

@@ -44,7 +44,7 @@ class TestSQLI:
             else:
                 for error in self.sql_dbms_errors:
                     if response.text.find(error) != -1:
-                        self.console.print(
+                        self.need rework console.print(
                             f"[red][[/red][green]+[/green][red]][/red]"
                             + f" [white]SQLI :[/white] {test_url}"
                         )

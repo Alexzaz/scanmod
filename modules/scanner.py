@@ -10,6 +10,9 @@ from rich.table import Table
 from modules.logger import banner
 from modules.utils import GetIpAdress, ScanMode, ScanType, is_root
 
+"""modify ADD CONNECT TO CH"""
+#import clickhouse_connect as ChConnect
+
 
 @dataclass()
 class TargetInfo:
@@ -237,7 +240,7 @@ def InitHostInfo(target_key) -> TargetInfo:
     )
 
 
-def InitPortInfo(port) -> tuple[str, str, str, str]:
+def InitPortInfo(port) -> tuple(str, str, str, str):
     state = "Unknown"
     service = "Unknown"
     product = "Unknown"
@@ -258,7 +261,7 @@ def InitPortInfo(port) -> tuple[str, str, str, str]:
     return state, service, product, version
 
 
-def AnalyseScanResults(nm, log, console, target=None) -> list:
+def AnalyseScanResults(nm, log, console, idScan, atomicInsert, target=None) -> list:
     """
     Analyse and print scan results.
     """
@@ -273,6 +276,12 @@ def AnalyseScanResults(nm, log, console, target=None) -> list:
         return []
 
     CurrentTargetInfo = InitHostInfo(nm[target])
+    atomicInsert['cIPv4'] = target
+    atomicInsert['nIPFlag'] = 0
+    atomicInsert['cMac'] = CurrentTargetInfo.mac
+    atomicInsert['cHostname'] = CurrentTargetInfo
+    atomicInsert['cOSName'] = CurrentTargetInfo.os
+    atomicInsert['nStatus'] = 0
 
     if is_root():
         if nm[target]["status"]["reason"] in ["localhost-response", "user-set"]:
@@ -284,10 +293,10 @@ def AnalyseScanResults(nm, log, console, target=None) -> list:
         log.logger("warning", f"Target {target} seems to have no open ports.")
         return HostArray
 
-    banner(f"Portscan results for {target}", "green", console)
+    #banner(f"Portscan results for {target}", "green", console)
 
-    if not CurrentTargetInfo.mac == "Unknown" and not CurrentTargetInfo.os == "Unknown":
-        console.print(CurrentTargetInfo.colored(), justify="center")
+    #if not CurrentTargetInfo.mac == "Unknown" and not CurrentTargetInfo.os == "Unknown":
+        #need rework console.print(CurrentTargetInfo.colored(), justify="center")
 
     table = Table(box=box.MINIMAL)
 
@@ -304,6 +313,6 @@ def AnalyseScanResults(nm, log, console, target=None) -> list:
         if state == "open":
             HostArray.insert(len(HostArray), [target, port, service, product, version])
 
-    console.print(table, justify="center")
+    #need rework console.print(table, justify="center")
 
     return HostArray

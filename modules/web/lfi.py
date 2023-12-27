@@ -85,7 +85,7 @@ class TestLFI:
                     continue
                 else:
                     if response.text.find("root:x:0:0:root:/root") != -1:
-                        self.console.print(
+                        self.need rework console.print(
                             f"[red][[/red][green]+[/green][red]][/red]"
                             + f" [white]LFI :[/white] {test_url}"
                         )

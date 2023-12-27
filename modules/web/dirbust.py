@@ -40,12 +40,12 @@ def dirbust(target_url, console, log) -> None:
             found_dirs.append(test_url)
 
             if req.is_redirect:
-                console.print(
+                need rework console.print(
                     f"[red][[/red][green]+[/green][red]][/red]"
                     + f" [white]DIR :[/white] {test_url} -> {req.url}"
                 )
             else:
-                console.print(
+                need rework console.print(
                     f"[red][[/red][green]+[/green][red]][/red]"
                     + f" [white]DIR :[/white] {test_url}"
                 )

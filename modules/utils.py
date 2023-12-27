@@ -496,7 +496,7 @@ def Confirmation(message) -> bool:
     return confirmation.lower() != "n"
 
 
-def UserConfirmation() -> tuple[bool, bool, bool]:
+def UserConfirmation() -> tuple(bool, bool, bool):
     if DontAskForConfirmation:
         return True, True, True
 
@@ -517,7 +517,7 @@ def WebScan() -> bool:
     return Confirmation("Do you want to scan for web vulnerabilities? [Y/n] : ")
 
 
-def GetHostsToScan(hosts, console) -> list[str]:
+def GetHostsToScan(hosts, console) -> list(str):
     if len(hosts) == 0:
         raise SystemExit(
             "No hosts found! {time} - Scan completed.".format(
@@ -532,19 +532,19 @@ def GetHostsToScan(hosts, console) -> list[str]:
 
         msg = Text.assemble(("[", "red"), (str(index), "cyan"), ("] ", "red"), host)
 
-        console.print(msg, justify="center")
+        #need rework console.print(msg, justify="center")
 
         index += 1
 
     if DontAskForConfirmation:
         return hosts
 
-    console.print(
+    """need rework console.print(
         "\n[yellow]Enter the index number of the "
         + "host you would like to enumurate further.\n"
         + "Enter 'all' to enumurate all hosts.\n"
         + "Enter 'exit' to exit [/yellow]"
-    )
+    )"""
 
     while True:
         host = input(f"────> ")
@@ -566,10 +566,10 @@ def GetHostsToScan(hosts, console) -> list[str]:
                     Targets = [hosts[int(host)]]
                     break
                 else:
-                    console.print(
+                    """need rework console.print(
                         "Please enter a valid host number or 'all' " + "or 'exit'",
                         style="red",
-                    )
+                    )"""
 
     return Targets
 
@@ -831,7 +831,7 @@ def ParamPrint(
 
     msg += "└" + "─" * (term_width - 1)
 
-    console.print(msg)
+    #need rework console.print(msg)
 
 
 def CheckConnection(log) -> bool:

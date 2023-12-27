@@ -37,4 +37,4 @@ ___           __          ____  _       __ _   __   _____         _  __
         height=height,
         subtitle="by GamehunterKaan (https://auto.pwnspot.com)",
     )
-    console.print(panel)
+    need rework console.print(panel)

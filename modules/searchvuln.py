@@ -6,6 +6,8 @@ from modules.nist_search import searchCVE
 from modules.utils import CheckConnection, get_terminal_width
 from rich.progress_bar import ProgressBar
 
+"""modify ADD CONNECT TO CH"""
+#import clickhouse_connect as ChConnect
 
 @dataclass
 class VulnerableSoftware:
@@ -43,9 +45,9 @@ def GenerateKeyword(product: str, version: str) -> str:
     return keyword
 
 
-def GenerateKeywords(HostArray: list) -> list:
+def GenerateKeywords(PortArray: list) -> list:
     keywords = []
-    for port in HostArray:
+    for port in PortArray:
         product = str(port[3])
         version = str(port[4])
 
@@ -70,15 +72,16 @@ def SearchKeyword(keyword: str, log, apiKey=None) -> list:
     return []
 
 
-def SearchSploits(HostArray: list, log, console, console2, apiKey=None) -> list:
+def SearchSploits(PortArray: list, log, console, console2, idScan, atomicInsert, ChClient, apiKey=None) -> list:
     VulnsArray = []
-    target = str(HostArray[0][0])
+    target = str(PortArray[0][0])
     term_width = get_terminal_width()
 
     if not CheckConnection(log):
         return []
 
-    keywords = GenerateKeywords(HostArray)
+    keywords = GenerateKeywords(PortArray)
+    countPort = 0
 
     if len(keywords) == 0:
         log.logger("warning", f"Insufficient information for {target}")
@@ -107,25 +110,56 @@ def SearchSploits(HostArray: list, log, console, console2, apiKey=None) -> list:
                 banner(f"Possible vulnerabilities for {target}", "red", console)
                 printed_banner = True
 
-            console.print(f"┌─ [yellow][ {keyword} ][/yellow]")
+            #need rework console.print(f"┌─ [yellow][ {keyword} ][/yellow]")
 
             CVEs = []
             for CVE in ApiResponseCVE:
                 CVEs.append(CVE.CVEID)
-                console.print(f"│\n├─────┤ [red]{CVE.CVEID}[/red]\n│")
+                #need rework console.print(f"│\n├─────┤ [red]{CVE.CVEID}[/red]\n│")
+                CVEalreadyInTable = ChClient.query("select cCVEId from tScanCVE where cCVEId = " + CVE.CVEID, query_formats = {'String': 'string'})
+                if CVEalreadyInTable.row_count == 0:
+                    dataInsert = [[\
+                                    CVE.CVEID,\
+                                    None,\
+                                    CVE.description,\
+                                    CVE.severity\
+                                    ]]
+                    ChClient.insert(\
+                                    table="tScanCVE",\
+                                    data = dataInsert,\
+                                    column_names = "cCVEId, cCVEName, cCVEDescription, cCVESeverity",\
+                                    column_type_names = ['String', 'String', 'String', 'String'],\
+                                    column_oriented = True,\
+                                    )
+                
+                #formatting data for CH about CVE
+                atomicInsert['CVEID'] = {\
+                                        'cIPv4': target,\
+                                        'nIPFlag': 0,\
+                                        'cPort': PortArray[0][1],\
+                                        'cTransProto': "TCP",\
+                                        'cBanner': PortArray[0][3],\
+                                        'cService': PortArray[0][2],\
+                                        'cVersion': PortArray[0][4],\
+                                        'cCVESeverity': CVE.severity,\
+                                        'cCVEName': None
+                                        }
+                
 
                 wrapped_description = wrap(CVE.description, term_width - 50)
-                console.print(f"│\t\t[cyan]Description: [/cyan]")
+               # need rework console.print(f"│\t\t[cyan]Description: [/cyan]")
                 for line in wrapped_description:
-                    console.print(f"│\t\t\t{line}")
-                console.print(
+                    #need rework console.print(f"│\t\t\t{line}")
+                    pass
+                """need rework console.print(
                     f"│\t\t[cyan]Severity: [/cyan]{CVE.severity} - {CVE.severity_score}\n"
                     + f"│\t\t[cyan]Exploitability: [/cyan] {CVE.exploitability}\n"
                     + f"│\t\t[cyan]Details: [/cyan] {CVE.details_url}"
-                )
+                )"""
 
             VulnObject = VulnerableSoftware(title=keyword, CVEs=CVEs)
             VulnsArray.append(VulnObject)
-            console.print("└" + "─" * (term_width - 1))
+            countPort += 1
+            #console.print("└" + "─" * (term_width - 1))
 
     return VulnsArray

@@ -64,7 +64,7 @@ class TestXSS:
                     continue
                 else:
                     if response.text.find(payload_text) != -1:
-                        self.console.print(
+                        self.need rework console.print(
                             f"[red][[/red][green]+[/green][red]][/red]"
                             + f" [white]XSS :[/white] {test_url}"
                         )
