@@ -496,7 +496,7 @@ def Confirmation(message) -> bool:
     return confirmation.lower() != "n"
 
 
-def UserConfirmation() -> tuple(bool, bool, bool):
+def UserConfirmation() -> tuple:
     if DontAskForConfirmation:
         return True, True, True
 
@@ -517,7 +517,7 @@ def WebScan() -> bool:
     return Confirmation("Do you want to scan for web vulnerabilities? [Y/n] : ")
 
 
-def GetHostsToScan(hosts, console) -> list(str):
+def GetHostsToScan(hosts, console) -> list:
     if len(hosts) == 0:
         raise SystemExit(
             "No hosts found! {time} - Scan completed.".format(
@@ -532,7 +532,7 @@ def GetHostsToScan(hosts, console) -> list(str):
 
         msg = Text.assemble(("[", "red"), (str(index), "cyan"), ("] ", "red"), host)
 
-        #need rework console.print(msg, justify="center")
+        console.print(msg, justify="center")
 
         index += 1
 

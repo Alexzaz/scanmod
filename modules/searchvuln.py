@@ -1,5 +1,7 @@
 from dataclasses import dataclass
 from textwrap import wrap
+from time import time
+from datetime import datetime
 
 from modules.logger import banner
 from modules.nist_search import searchCVE
@@ -15,14 +17,17 @@ class VulnerableSoftware:
     CVEs: list
 
 
-def GenerateKeyword(product: str, version: str) -> str:
-    if product == "Unknown":
+def GenerateKeyword(product: str, version: str, service: str):
+    if product.lower().rstrip() == "unknown":
         product = ""
 
-    if version == "Unknown":
+    if version.lower().rstrip() == "unknown":
         version = ""
 
-    keyword = ""
+    if service.lower().rstrip() == "unknown":
+        service = ""
+
+    keyword = [""]
     dontsearch = [
         "ssh",
         "vnc",
@@ -40,8 +45,11 @@ def GenerateKeyword(product: str, version: str) -> str:
     ]
 
     if product.lower() not in dontsearch and product != "":
-        keyword = f"{product} {version}".rstrip()
-
+        keyword = [f"{product} {version}".rstrip(), f"{product}".rstrip()]
+    elif product == "" and version != "" and service not in dontsearch and service != "":
+        keyword = [f"{service} {version}".rstrip(), f"{service}".rstrip()]
+    elif product == "" and version == "" and service not in dontsearch and service != "":
+        keyword = [f"{service}".rstrip()]
     return keyword
 
 
@@ -50,15 +58,16 @@ def GenerateKeywords(PortArray: list) -> list:
     for port in PortArray:
         product = str(port[3])
         version = str(port[4])
+        service =  str(port[2])
 
-        keyword = GenerateKeyword(product, version)
-        if not keyword == "" and not keyword in keywords:
-            keywords.append(keyword)
+        keyword = GenerateKeyword(product, version, service)
+        if keyword[0] != "" and (keyword, str(port[1])) not in keywords:
+            keywords.append((keyword, str(port[1])))
 
     return keywords
 
 
-def SearchKeyword(keyword: str, log, apiKey=None) -> list:
+def SearchKeyword(keyword: tuple, log, apiKey=None) -> list:
 
     try:
         ApiResponseCVE = searchCVE(keyword, log, apiKey)
@@ -72,7 +81,7 @@ def SearchKeyword(keyword: str, log, apiKey=None) -> list:
     return []
 
 
-def SearchSploits(PortArray: list, log, console, console2, idScan, atomicInsert, ChClient, apiKey=None) -> list:
+def SearchSploits(PortArray: list, log, console, console2, idScan, insertDate, atomicInsert, ChClient, apiKey=None) -> list:
     VulnsArray = []
     target = str(PortArray[0][0])
     term_width = get_terminal_width()
@@ -91,17 +100,38 @@ def SearchSploits(PortArray: list, log, console, console2, idScan, atomicInsert,
         "info", f"Searching vulnerability database for {len(keywords)} keyword(s) ..."
     )
 
+    print(keywords)
+
     printed_banner = False
     with console2.status(
         "[white]Searching vulnerabilities ...[/white]", spinner="bouncingBar"
     ) as status:
         for keyword in keywords:
+            print(keyword)
+            if (time() - insertDate) > 30:
+                insertDate = time()
+                print("change time")
+                ChClient.command("alter table stet.tScanHistory update dtEndTime = \'" +\
+                                datetime.fromtimestamp(insertDate + 30).strftime("%Y-%m-%d %H:%M:%S") +\
+                                "\' where idScan = " + str(idScan)
+                                )
             status.start()
             status.update(
                 "[white]Searching vulnerability database for[/white] "
                 + f"[red]{keyword}[/red] [white]...[/white]"
             )
-            ApiResponseCVE = SearchKeyword(keyword, log, apiKey)
+            for value in keyword[0]:
+                if value != "":
+                    ApiResponseCVE = SearchKeyword(keyword, log, apiKey)
+                else:
+                    ApiResponseCVE = []
+            if (time() - insertDate) > 30:
+                insertDate = time()
+                print("change time")
+                ChClient.command("alter table stet.tScanHistory update dtEndTime = \'" +\
+                                datetime.fromtimestamp(insertDate + 30).strftime("%Y-%m-%d %H:%M:%S") +\
+                                "\' where idScan = " + str(idScan)
+                                )
             status.stop()
             if len(ApiResponseCVE) == 0:
                 continue
@@ -110,52 +140,62 @@ def SearchSploits(PortArray: list, log, console, console2, idScan, atomicInsert,
                 banner(f"Possible vulnerabilities for {target}", "red", console)
                 printed_banner = True
 
-            #need rework console.print(f"┌─ [yellow][ {keyword} ][/yellow]")
+            #console.print(f"┌─ [yellow][ {keyword} ][/yellow]")
 
             CVEs = []
+            count_ = 0
             for CVE in ApiResponseCVE:
-                CVEs.append(CVE.CVEID)
-                #need rework console.print(f"│\n├─────┤ [red]{CVE.CVEID}[/red]\n│")
-                CVEalreadyInTable = ChClient.query("select cCVEId from tScanCVE where cCVEId = " + CVE.CVEID, query_formats = {'String': 'string'})
-                if CVEalreadyInTable.row_count == 0:
-                    dataInsert = [[\
-                                    CVE.CVEID,\
-                                    None,\
-                                    CVE.description,\
-                                    CVE.severity\
-                                    ]]
-                    ChClient.insert(\
-                                    table="tScanCVE",\
-                                    data = dataInsert,\
-                                    column_names = "cCVEId, cCVEName, cCVEDescription, cCVESeverity",\
-                                    column_type_names = ['String', 'String', 'String', 'String'],\
-                                    column_oriented = True,\
-                                    )
-                
-                #formatting data for CH about CVE
-                atomicInsert['CVEID'] = {\
-                                        'cIPv4': target,\
-                                        'nIPFlag': 0,\
-                                        'cPort': PortArray[0][1],\
-                                        'cTransProto': "TCP",\
-                                        'cBanner': PortArray[0][3],\
-                                        'cService': PortArray[0][2],\
-                                        'cVersion': PortArray[0][4],\
-                                        'cCVESeverity': CVE.severity,\
-                                        'cCVEName': None
-                                        }
-                
+                if count_ < 2000:
+                    if (time() - insertDate) > 30:
+                        insertDate = time()
+                        print("change time")
+                        ChClient.command("alter table stet.tScanHistory update dtEndTime = \'" +\
+                                        datetime.fromtimestamp(insertDate + 30).strftime("%Y-%m-%d %H:%M:%S") +\
+                                        "\' where idScan = " + str(idScan)
+                                        )
+                    CVEs.append(CVE.CVEID)
+                    #console.print(f"│\n├─────┤ [red]{CVE.CVEID}[/red]\n│")
+                    CVEalreadyInTable = ChClient.query(
+                        "select cCVEId from tScanCVE where cCVEId = \'" + CVE.CVEID + "\'",\
+                        query_formats = {'String': 'string'})
+                    if CVEalreadyInTable.row_count == 0:
+                        dataInsert = [[
+                                        str(CVE.CVEID),\
+                                        '',\
+                                        str(CVE.description),\
+                                        str(CVE.severity)\
+                                        ]]
+                        ChClient.insert(\
+                                        table="tScanCVE",\
+                                        data = dataInsert,\
+                                        column_names = ["cCVEId", "cCVEName", "cCVEDescription", "cCVESeverity"],\
+                                        column_type_names = ['String', 'String', 'String', 'String']
+                                        )
+                    
+                            
+                            
+                    #formatting data for CH about CVE
+                    atomicInsert['CVEofHost'][CVE.CVEID] = {\
+                                            'cIPv4': target,\
+                                            'nIPFlag': 0,\
+                                            'cPort': CVE.port,\
+                                            'cTransProto': "TCP",\
+                                            'cBanner': atomicInsert['aboutHost']['ports'][str(CVE.port)]['cBanner'],\
+                                            'cService': atomicInsert['aboutHost']['ports'][str(CVE.port)]['cService'],\
+                                            'cVersion': atomicInsert['aboutHost']['ports'][str(CVE.port)]['cVersion'],\
+                                            'cCVESeverity': CVE.severity,\
+                                            'cCVEName': ""
+                                            }
+                    
 
-                wrapped_description = wrap(CVE.description, term_width - 50)
-               # need rework console.print(f"│\t\t[cyan]Description: [/cyan]")
-                for line in wrapped_description:
-                    #need rework console.print(f"│\t\t\t{line}")
-                    pass
-                """need rework console.print(
-                    f"│\t\t[cyan]Severity: [/cyan]{CVE.severity} - {CVE.severity_score}\n"
-                    + f"│\t\t[cyan]Exploitability: [/cyan] {CVE.exploitability}\n"
-                    + f"│\t\t[cyan]Details: [/cyan] {CVE.details_url}"
-                )"""
+                    wrapped_description = wrap(CVE.description, term_width - 50)
+                    #console.print(f"│\t\t[cyan]Description: [/cyan]")
+                    #for line in wrapped_description:
+                        #console.print(f"│\t\t\t{line}")
+                    #console.print(
+                        #f"│\t\t[cyan]Severity: [/cyan]{CVE.severity}\n"
+                    #)
+                    count_ += 1
 
             VulnObject = VulnerableSoftware(title=keyword, CVEs=CVEs)
             VulnsArray.append(VulnObject)

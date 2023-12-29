@@ -1,4 +1,5 @@
-from datetime import datetime, timedelta
+from datetime import datetime
+from time import time
 
 from rich.console import Console
 
@@ -38,21 +39,31 @@ def StartScanning(
 
     ChClient = ChConnect.create_client(host = "127.0.0.1", interface = "http", port = 8123, database = "stet", client_name = "SCANNER")
     idScan = int(ChClient.command("select max(idScan) from tScanHistory"))
-    insertDate = datetime.now()
+    if idScan == 0:
+        idScan = 1
+    else:
+        idScan += 1
+    insertDate = time() + 30
     dataInsert = [[\
                     idScan,\
-                    insertDate.strftime("%b %d %Y %H:%M:%S"),\
-                    (insertDate + timedelta(seconds = 10)).strftime("%b %d %Y %H:%M:%S"),\
-                    [targetarg],\
+                    datetime.fromtimestamp(insertDate - 30),\
+                    datetime.fromtimestamp(insertDate),\
+                    targetarg,\
                     1,\
                     "Сканирование в процессе"\
                     ]]
+    column_names_ = ["idScan",\
+                        "dtStartTime",\
+                        "dtEndTime",\
+                        "cNetworks",\
+                        "nStatus",\
+                        "cStatusDescription"\
+                    ]
     ChClient.insert(\
                     table="tScanHistory",\
                     data = dataInsert,\
-                    column_names = "idScan, dtStartTime, dtEndTime, cNetworks, nStatus, cStatusDescription",\
-                    column_type_names = ['UInt64', 'DateTime', 'DateTime', 'Array(String)', 'UInt8', 'String'],\
-                    column_oriented = True,\
+                    column_names = column_names_,\
+                    column_type_names = ['UInt64', 'DateTime', 'DateTime', 'String', 'UInt8', 'String'],\
                     )
 
     check_nmap(log)
@@ -71,73 +82,102 @@ def StartScanning(
 
     for host in Targets:
         if ScanPorts:
-            atomicInsert = {'aboutHost': {}, 'CVEofHost': {}}
+            atomicInsert = {'aboutHost': {'ports': {}}, 'CVEofHost': {}}
             PortScanResults = PortScan(
-                host, log, args.speed, args.host_timeout, scanmode, args.nmap_flags
+                host, log, ChClient, insertDate, idScan, args.speed, args.host_timeout, scanmode, args.nmap_flags
             )
-            PortArray = AnalyseScanResults(PortScanResults, log, console, idScan, atomicInsert.aboutHost, host)
-            if ScanVulns and len(PortArray) > 0:
-                VulnsArray = SearchSploits(PortArray, log, console, console2, idScan, atomicInsert.CVEofHost, ChClient, apiKey)
-                if DownloadExploits and len(VulnsArray) > 0:
-                    GetExploitsFromArray(VulnsArray, log, console, console2, host)
-                insertTime = datetime.now().strftime("%b %d %Y %H:%M:%S")
-                dataInsert = [[idScan,\
-                                insertTime,\
-                                atomicInsert['aboutHost']['cIPv4'],\
+            print(host)
+            PortArray = AnalyseScanResults(PortScanResults, log, console, idScan, insertDate, atomicInsert['aboutHost'], ChClient, host)
+            if (time() - insertDate) > 30:
+                insertDate = time()
+                print("change time")
+                ChClient.command("alter table stet.tScanHistory update dtEndTime = \'" +\
+                                datetime.fromtimestamp(insertDate + 30).strftime("%Y-%m-%d %H:%M:%S") +\
+                                "\' where idScan = " + str(idScan)
+                                )
+            insertTime_ = datetime.now()
+            dataInsert = [[idScan,\
+                                insertTime_,\
+                                host,\
                                 atomicInsert['aboutHost']['nIPFlag'],\
                                 atomicInsert['aboutHost']['cMac'],\
-                                None,\
-                                None,\
-                                None,\
-                                None,\
-                                None,\
-                                None,\
-                                None,\
-                                None,\
+                                0,\
+                                '',\
+                                '',\
+                                '',\
+                                '',\
+                                '',\
+                                '',\
+                                '',\
                                 atomicInsert['aboutHost']['cHostname'],\
                                 atomicInsert['aboutHost']['cOSName'],\
                                 atomicInsert['aboutHost']['nStatus']]]
-                column_names_ = "idScan,\
-                                    dtInsertTime,\
-                                    cIPv4,\
-                                    nIPFlag,\
-                                    cMac,\
-                                    nPort,\
-                                    cTransProto,\
-                                    cBanner,\
-                                    cService,\
-                                    cVersion,\
-                                    cCVEid,\
-                                    cCVESeverity,\
-                                    cCVEName,\
-                                    cHostname,\
-                                    cOSName,\
-                                    nStatus"
-                column_type_names_ = [\
-                                        'UInt64',\
-                                        'DateTime',\
-                                        'IPv4',\
-                                        'UInt8',\
-                                        'String',\
-                                        'UInt16',\
-                                        'String',\
-                                        'String',\
-                                        'String',\
-                                        'String',\
-                                        'String',\
-                                        'String',\
-                                        'String',\
-                                        'String',\
-                                        'String',\
-                                        'UInt16'
-                                    ]
+            for port_ in atomicInsert['aboutHost']['ports'].keys():
+                addingPort = [
+                        idScan,\
+                        insertTime_,\
+                        host,\
+                        atomicInsert['aboutHost']['nIPFlag'],\
+                        '',\
+                        int(port_),\
+                        'TCP',\
+                        atomicInsert['aboutHost']['ports'][port_]['cBanner'],\
+                        atomicInsert['aboutHost']['ports'][port_]['cService'],\
+                        atomicInsert['aboutHost']['ports'][port_]['cVersion'],\
+                        '',\
+                        '',\
+                        '',\
+                        '',\
+                        '',\
+                        0
+                    ]
+                dataInsert.append(addingPort)
+            column_names_ = ["idScan",\
+                                "dtInsertTime",\
+                                "cIPv4",\
+                                "nIPFlag",\
+                                "cMac",\
+                                "nPort",\
+                                "cTransProto",\
+                                "cBanner",\
+                                "cService",\
+                                "cVersion",\
+                                "cCVEid",\
+                                "cCVESeverity",\
+                                "cCVEName",\
+                                "cHostname",\
+                                "cOSName",\
+                                "nStatus"
+                            ]
+            column_type_names_ = [\
+                                    'UInt64',\
+                                    'DateTime',\
+                                    'IPv4',\
+                                    'UInt8',\
+                                    'String',\
+                                    'UInt16',\
+                                    'String',\
+                                    'String',\
+                                    'String',\
+                                    'String',\
+                                    'String',\
+                                    'String',\
+                                    'String',\
+                                    'String',\
+                                    'String',\
+                                    'UInt16'
+                                ]
+            if ScanVulns and len(PortArray) > 0:
+                VulnsArray = SearchSploits(PortArray, log, console, console2, idScan, insertDate, atomicInsert, ChClient, apiKey)
+                #if DownloadExploits and len(VulnsArray) > 0:
+                    #GetExploitsFromArray(VulnsArray, log, console, console2, host)
                 for CVE_ID in atomicInsert['CVEofHost'].keys():
                     addingCve = [
                         idScan,\
-                        insertTime,\
+                        insertTime_,\
                         atomicInsert['CVEofHost'][CVE_ID]['cIPv4'],\
                         atomicInsert['CVEofHost'][CVE_ID]['nIPFlag'],\
-                        None,\
+                        '',\
                         atomicInsert['CVEofHost'][CVE_ID]['cPort'],\
                         atomicInsert['CVEofHost'][CVE_ID]['cTransProto'],\
                         atomicInsert['CVEofHost'][CVE_ID]['cBanner'],\
@@ -146,28 +186,33 @@ def StartScanning(
                         CVE_ID,\
                         atomicInsert['CVEofHost'][CVE_ID]['cCVESeverity'],\
                         atomicInsert['CVEofHost'][CVE_ID]['cCVEName'],\
-                        None,\
-                        None,\
+                        '',\
+                        '',\
                         0
                     ]
                     dataInsert.append(addingCve)
-                ChClient.insert(\
-                    table="tScanData",\
-                    data = dataInsert,\
-                    column_names = column_names_,\
-                    column_type_names = column_type_names_,\
-                    column_oriented = True,\
-                    )
+            ChClient.insert(\
+                table="tScanData",\
+                data = dataInsert,\
+                column_names = column_names_,\
+                column_type_names = column_type_names_,\
+                )
                 
 
-        if ScanWeb:
-            webvuln(host, log, console)
+        """if ScanWeb:
+            webvuln(host, log, console)"""
 
-    """need rework console.print(
+    console.print(
         "{time} - Scan completed.".format(
-            time=datetime.now().strftime("%b %d %Y %H:%M:%S")
+            time=datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         )
-    )"""
+    )
+    ChClient.command("alter table stet.tScanHistory update dtEndTime = \'" +\
+                            datetime.fromtimestamp(time()).strftime("%Y-%m-%d %H:%M:%S") +\
+                            "\', nStatus = " + '0' +\
+                            ", cStatusDescription = \'Сканирование завершено без ошибок\'" +\
+                            " where idScan = " + str(idScan)
+                            )
 
 
 
@@ -184,11 +229,11 @@ def main() -> None:
         console2 = Console(record=False, color_system="truecolor")
     log = Logger(console)
 
-    """if args.version:
+    if args.version:
         print(f"AutoPWN Suite v{__version__}")
-        raise SystemExit"""
+        raise SystemExit
 
-    #print_banner(console)
+    print_banner(console)
     check_version(__version__, log)
 
     if args.config:
@@ -201,7 +246,7 @@ def main() -> None:
     apiKey = InitArgsAPI(args, log)
     ReportMethod, ReportObject = InitReport(args, log)
 
-    #ParamPrint(args, targetarg, scantype, scanmode, apiKey, console, log)
+    ParamPrint(args, targetarg, scantype, scanmode, apiKey, console, log)
 
     StartScanning(args, targetarg, scantype, scanmode, apiKey, console, console2, log)
 

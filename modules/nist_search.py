@@ -13,84 +13,75 @@ class Vulnerability:
     CVEID: str
     description: str
     severity: str
-    severity_score: float
-    details_url: str
-    exploitability: float
+    port: str
+
 
     def __str__(self) -> str:
         return (
             f"Title : {self.title}\n"
             + f"CVE_ID : {self.CVEID}\n"
             + f"Description : {self.description}\n"
-            + f"Severity : {self.severity} - {self.severity_score}\n"
-            + f"Details : {self.details_url}\n"
-            + f"Exploitability : {self.exploitability}"
+            + f"Severity : {self.severity}\n"
         )
 
 
 def FindVars(vuln: dict) -> tuple:
-    CVE_ID = vuln["cve"]["CVE_data_meta"]["ID"]
-    description = vuln["cve"]["description"]["description_data"][0]["value"]
+    CVE_ID = vuln["cve"]["id"]
+    description = vuln["cve"]["descriptions"][0]["value"]
 
-    exploitability = 0.0
-    severity_score = 0.0
     severity = "UNKNOWN"
 
-    if "baseMetricV3" in vuln["impact"].keys():
-        if "exploitabilityScore" in vuln["impact"]["baseMetricV3"]:
-            exploitability = vuln["impact"]["baseMetricV3"]["exploitabilityScore"]
-        elif "cvssV3" in vuln["impact"]["baseMetricV3"]:
-            exploitability = vuln["impact"]["baseMetricV3"]["cvssV3"][
-                "exploitabilityScore"
-            ]
 
-        if "cvssV3" in vuln["impact"]["baseMetricV3"]:
-            if "baseSeverity" in vuln["impact"]["baseMetricV3"]["cvssV3"]:
-                severity = vuln["impact"]["baseMetricV3"]["cvssV3"]["baseSeverity"]
+    if "cvssMetricV31" in vuln["cve"]["metrics"].keys():
+        for _ in vuln["cve"]["metrics"]["cvssMetricV31"]:
+            if _["type"].lower() == "primary":
+                severity = _["cvssData"]["baseSeverity"]
 
-            if "baseScore" in vuln["impact"]["baseMetricV3"]["cvssV3"]:
-                severity_score = vuln["impact"]["baseMetricV3"]["cvssV3"]["baseScore"]
+    elif "cvssMetricV30" in vuln["cve"]["metrics"].keys():
+        for _ in vuln["cve"]["metrics"]["cvssMetricV30"]:
+            if _["type"].lower() == "primary":
+                severity = _["cvssData"]["baseSeverity"]
 
-    elif "baseMetricV2" in vuln["impact"].keys():
-        if "exploitabilityScore" in vuln["impact"]["baseMetricV2"].keys():
-            exploitability = vuln["impact"]["baseMetricV2"]["exploitabilityScore"]
-        elif "cvssV2" in vuln["impact"]["baseMetricV2"]:
-            exploitability = vuln["impact"]["baseMetricV2"]["cvssV2"][
-                "exploitabilityScore"
-            ]
+    elif "cvssMetricV2" in vuln["cve"]["metrics"].keys():
+        for _ in vuln["cve"]["metrics"]["cvssMetricV2"]:
+            if _["type"].lower() == "primary":
+                if _["cvssData"]["baseScore"] >= 9.0:
+                    severity = "CRITICAL"
+                else:
+                    severity = _["baseSeverity"]
 
-        if "cvssV2" in vuln["impact"]["baseMetricV2"]:
-            if "baseSeverity" in vuln["impact"]["baseMetricV2"]["cvssV2"]:
-                severity = vuln["impact"]["baseMetricV2"]["cvssV2"]["baseSeverity"]
-            elif "severity" in vuln["impact"]["baseMetricV2"].keys():
-                severity = vuln["impact"]["baseMetricV2"]["severity"]
-
-            if "baseScore" in vuln["impact"]["baseMetricV2"]["cvssV2"]:
-                severity_score = vuln["impact"]["baseMetricV2"]["cvssV2"]["baseScore"]
-
-    details_url = vuln["cve"]["references"]["reference_data"][0]["url"]
-
-    return CVE_ID, description, severity, severity_score, details_url, exploitability
+    return CVE_ID, description, severity
 
 
-def searchCVE(keyword: str, log, apiKey=None) -> list(Vulnerability):
+def searchCVE(keyword: tuple, log, apiKey=None) -> list:
     url = "https://services.nvd.nist.gov/rest/json/cves/2.0?"
     if apiKey:
         sleep_time = 1.7
-        paramaters = {"keyword": keyword}
         headers = {"apiKey": apiKey}
     else:
         sleep_time = 8
-        paramaters = {"keyword": keyword}
+        headers = {}
 
-    if keyword in cache:
-        return cache[keyword]
-
+    if keyword[0][0] in cache and cache[keyword[0][0]][0].port == int(keyword[1]):
+        return cache[keyword[0][0]]
+    elif keyword[0][0] in cache:
+        for _ in cache[keyword[0][0]]:
+            _.port = int(keyword[1])
+        return cache[keyword[0][0]]
+    
+    title_ = ''
+    data = ''
     for tries in range(3):
         try:
-            sleep(sleep_time)
-            request = get(url, headers=headers, params=paramaters)
-            data = request.json()
+            for value in keyword[0]:
+                sleep(sleep_time)
+                paramaters = {"keywordSearch": value}
+                request = get(url, headers=headers, params=paramaters)
+                data = request.json()
+                if data['totalResults'] != 0:
+                    title_ = value
+                    break
+
         except Exception as e:
             if request.status_code == 403:
                 log.logger(
@@ -103,30 +94,25 @@ def searchCVE(keyword: str, log, apiKey=None) -> list(Vulnerability):
             break
 
     Vulnerabilities = []
-    if not "result" in data:
+    if data['totalResults'] == 0:
         return []
 
-    for vuln in data["result"]["CVE_Items"]:
-        title = keyword
+
+    for vuln in data["vulnerabilities"]:
+        title = title_
         (
             CVE_ID,
             description,
-            severity,
-            severity_score,
-            details_url,
-            exploitability,
+            severity
         ) = FindVars(vuln)
         VulnObject = Vulnerability(
             title=title,
             CVEID=CVE_ID,
             description=description,
             severity=severity,
-            severity_score=severity_score,
-            details_url=details_url,
-            exploitability=exploitability,
+            port=int(keyword[1])
         )
-
         Vulnerabilities.append(VulnObject)
 
-    cache[keyword] = Vulnerabilities
+    cache[title_] = Vulnerabilities
     return Vulnerabilities

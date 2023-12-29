@@ -1,7 +1,8 @@
 from dataclasses import dataclass
 from enum import Enum
 from multiprocessing import Process
-from time import sleep
+from time import sleep, time
+from datetime import datetime
 
 from nmap import PortScanner
 from rich import box
@@ -73,14 +74,24 @@ def TestArp(target, mode=ScanMode.Normal) -> list:
 def PortScan(
     target,
     log,
+    ChClient,
+    insertDate,
+    idScan,
     scanspeed=5,
     host_timeout=240,
     mode=ScanMode.Normal,
-    customflags="",
+    customflags=""
 ) -> PortScanner:
 
     log.logger("info", f"Scanning {target} for open ports ...")
 
+    if (time() - insertDate) > 30:
+        insertDate = time()
+        print("change time")
+        ChClient.command("alter table stet.tScanHistory update dtEndTime = \'" +\
+                        datetime.fromtimestamp(insertDate + 30).strftime("%Y-%m-%d %H:%M:%S") +\
+                        "\' where idScan = " + str(idScan)
+                        )
     nm = PortScanner()
     try:
         if is_root():
@@ -136,9 +147,32 @@ def PortScan(
                     ]
                 ),
             )
+        if (time() - insertDate) > 30:
+            insertDate = time()
+            print("change time")
+            ChClient.command("alter table stet.tScanHistory update dtEndTime = \'" +\
+                            datetime.fromtimestamp(insertDate + 30).strftime("%Y-%m-%d %H:%M:%S") +\
+                            "\' where idScan = " + str(idScan)
+                            )
     except Exception as e:
+        if (time() - insertDate) > 30:
+            insertDate = time()
+            print("change time")
+            ChClient.command("alter table stet.tScanHistory update dtEndTime = \'" +\
+                            datetime.fromtimestamp(insertDate + 30).strftime("%Y-%m-%d %H:%M:%S") +\
+                            "\', nStatus = " + '2' +\
+                            ", cStatusDescription = \'Ошибка при сканировании узла " + target +\
+                            "\' where idScan = " + str(idScan)
+                            )
         raise SystemExit(f"Error: {e}")
     else:
+        if (time() - insertDate) > 30:
+            insertDate = time()
+            print("change time")
+            ChClient.command("alter table stet.tScanHistory update dtEndTime = \'" +\
+                            datetime.fromtimestamp(insertDate + 30).strftime("%Y-%m-%d %H:%M:%S") +\
+                            "\' where idScan = " + str(idScan)
+                            )
         return nm
 
 
@@ -240,7 +274,7 @@ def InitHostInfo(target_key) -> TargetInfo:
     )
 
 
-def InitPortInfo(port) -> tuple(str, str, str, str):
+def InitPortInfo(port):
     state = "Unknown"
     service = "Unknown"
     product = "Unknown"
@@ -261,7 +295,7 @@ def InitPortInfo(port) -> tuple(str, str, str, str):
     return state, service, product, version
 
 
-def AnalyseScanResults(nm, log, console, idScan, atomicInsert, target=None) -> list:
+def AnalyseScanResults(nm, log, console, idScan, insertDate,  atomicInsert, ChClient, target=None) -> list:
     """
     Analyse and print scan results.
     """
@@ -279,9 +313,10 @@ def AnalyseScanResults(nm, log, console, idScan, atomicInsert, target=None) -> l
     atomicInsert['cIPv4'] = target
     atomicInsert['nIPFlag'] = 0
     atomicInsert['cMac'] = CurrentTargetInfo.mac
-    atomicInsert['cHostname'] = CurrentTargetInfo
+    atomicInsert['cHostname'] = ''
     atomicInsert['cOSName'] = CurrentTargetInfo.os
     atomicInsert['nStatus'] = 0
+    
 
     if is_root():
         if nm[target]["status"]["reason"] in ["localhost-response", "user-set"]:
@@ -293,10 +328,10 @@ def AnalyseScanResults(nm, log, console, idScan, atomicInsert, target=None) -> l
         log.logger("warning", f"Target {target} seems to have no open ports.")
         return HostArray
 
-    #banner(f"Portscan results for {target}", "green", console)
+    banner(f"Portscan results for {target}", "green", console)
 
-    #if not CurrentTargetInfo.mac == "Unknown" and not CurrentTargetInfo.os == "Unknown":
-        #need rework console.print(CurrentTargetInfo.colored(), justify="center")
+    if not CurrentTargetInfo.mac == "Unknown" and not CurrentTargetInfo.os == "Unknown":
+        console.print(CurrentTargetInfo.colored(), justify="center")
 
     table = Table(box=box.MINIMAL)
 
@@ -307,12 +342,24 @@ def AnalyseScanResults(nm, log, console, idScan, atomicInsert, target=None) -> l
     table.add_column("Version", style="purple")
 
     for port in nm[target]["tcp"].keys():
+        if (time() - insertDate) > 30:
+            insertDate = time()
+            print("change time")
+            ChClient.command("alter table stet.tScanHistory update dtEndTime = \'" +\
+                            datetime.fromtimestamp(insertDate + 30).strftime("%Y-%m-%d %H:%M:%S") +\
+                            "\' where idScan = " + str(idScan)
+                            )
         state, service, product, version = InitPortInfo(nm[target]["tcp"][port])
+        atomicInsert['ports'][str(port)] = {
+            'cService': service,
+            'cBanner': str(product),
+            'cVersion': version
+        }
         table.add_row(str(port), state, service, product, version)
 
         if state == "open":
             HostArray.insert(len(HostArray), [target, port, service, product, version])
 
-    #need rework console.print(table, justify="center")
+    console.print(table, justify="center")
 
     return HostArray
