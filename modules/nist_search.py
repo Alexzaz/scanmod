@@ -54,7 +54,7 @@ def FindVars(vuln: dict) -> tuple:
 
 
 def searchCVE(keyword: tuple, log, apiKey=None) -> list:
-    url = "https://services.nvd.nist.gov/rest/json/cves/2.0?"
+    url = "https://services.nvd.nist.gov/rest/json/cves/2.0?noRejected&"
     if apiKey:
         sleep_time = 1.7
         headers = {"apiKey": apiKey}

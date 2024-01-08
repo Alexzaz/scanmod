@@ -44,11 +44,15 @@ def StartScanning(
     else:
         idScan += 1
     insertDate = time() + 30
+    ipAll = 32 - int(targetarg.split('/')[1])
+    ipAll = 2**ipAll
     dataInsert = [[\
                     idScan,\
                     datetime.fromtimestamp(insertDate - 30),\
                     datetime.fromtimestamp(insertDate),\
                     targetarg,\
+                    0,\
+                    ipAll,\
                     1,\
                     "Сканирование в процессе"\
                     ]]
@@ -56,6 +60,8 @@ def StartScanning(
                         "dtStartTime",\
                         "dtEndTime",\
                         "cNetworks",\
+                        "nIPScanned",\
+                        "nIPAll",\
                         "nStatus",\
                         "cStatusDescription"\
                     ]
@@ -63,7 +69,7 @@ def StartScanning(
                     table="tScanHistory",\
                     data = dataInsert,\
                     column_names = column_names_,\
-                    column_type_names = ['UInt64', 'DateTime', 'DateTime', 'String', 'UInt8', 'String'],\
+                    column_type_names = ['UInt64', 'DateTime', 'DateTime', 'String', 'UInt32', 'UInt32' ,'UInt8', 'String'],\
                     )
 
     check_nmap(log)
@@ -197,6 +203,11 @@ def StartScanning(
                 column_names = column_names_,\
                 column_type_names = column_type_names_,\
                 )
+            ipScanned = int(ChClient.command("select nIPScanned from tScanHistory where idScan = " + str(idScan)))
+            ChClient.command("alter table stet.tScanHistory update nIPScanned = " +\
+                            str(ipScanned + 1) +\
+                            " where idScan = " + str(idScan)
+                            )
                 
 
         """if ScanWeb:
