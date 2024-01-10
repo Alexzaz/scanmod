@@ -386,6 +386,7 @@ def InitArgsTarget(args, log):
             if DontAskForConfirmation:
                 try:
                     target = DetectIPRange()
+                    print(target)
                 except Exception as e:
                     log.logger("error", e)
                     target = input("Enter target range to scan : ")
@@ -831,7 +832,7 @@ def ParamPrint(
 
     msg += "└" + "─" * (term_width - 1)
 
-    #need rework console.print(msg)
+    console.print(msg)
 
 
 def CheckConnection(log) -> bool:

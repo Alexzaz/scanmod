@@ -126,7 +126,7 @@ def StartScanning(
                         atomicInsert['aboutHost']['nIPFlag'],\
                         '',\
                         int(port_),\
-                        'TCP',\
+                        atomicInsert['aboutHost']['ports'][port_]['cTransProto'],\
                         atomicInsert['aboutHost']['ports'][port_]['cBanner'],\
                         atomicInsert['aboutHost']['ports'][port_]['cService'],\
                         atomicInsert['aboutHost']['ports'][port_]['cVersion'],\

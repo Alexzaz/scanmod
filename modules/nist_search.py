@@ -54,7 +54,7 @@ def FindVars(vuln: dict) -> tuple:
 
 
 def searchCVE(keyword: tuple, log, apiKey=None) -> list:
-    url = "https://services.nvd.nist.gov/rest/json/cves/2.0?noRejected&"
+    url = "https://services.nvd.nist.gov/rest/json/cves/2.0?"
     if apiKey:
         sleep_time = 1.7
         headers = {"apiKey": apiKey}
@@ -62,26 +62,21 @@ def searchCVE(keyword: tuple, log, apiKey=None) -> list:
         sleep_time = 8
         headers = {}
 
-    if keyword[0][0] in cache and cache[keyword[0][0]][0].port == int(keyword[1]):
-        return cache[keyword[0][0]]
-    elif keyword[0][0] in cache:
-        for _ in cache[keyword[0][0]]:
+    if keyword[0] in cache and cache[keyword[0]].port == int(keyword[1]):
+        return cache[keyword[0]]
+    elif keyword[0] in cache:
+        for _ in cache[keyword[0]]:
             _.port = int(keyword[1])
-        return cache[keyword[0][0]]
+        return cache[keyword[0]]
     
     title_ = ''
     data = ''
     for tries in range(3):
         try:
-            for value in keyword[0]:
-                sleep(sleep_time)
-                paramaters = {"keywordSearch": value}
-                request = get(url, headers=headers, params=paramaters)
-                data = request.json()
-                if data['totalResults'] != 0:
-                    title_ = value
-                    break
-
+            sleep(sleep_time)
+            paramaters = {"cpeName": "cpe:2.3:" + keyword[0] + ":*:*:*:*:*:*:*"}
+            request = get(url, headers=headers, params=paramaters)
+            data = request.json()
         except Exception as e:
             if request.status_code == 403:
                 log.logger(

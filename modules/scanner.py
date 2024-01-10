@@ -1,4 +1,6 @@
+import nmap3
 from dataclasses import dataclass
+from re import match as rematch
 from enum import Enum
 from multiprocessing import Process
 from time import sleep, time
@@ -13,6 +15,11 @@ from modules.utils import GetIpAdress, ScanMode, ScanType, is_root
 
 """modify ADD CONNECT TO CH"""
 #import clickhouse_connect as ChConnect
+
+
+"""add function for regular express"""
+def is_ip(str_):
+    return bool(rematch(r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}', str_))
 
 
 @dataclass()
@@ -60,14 +67,20 @@ def TestPing(target, mode=ScanMode.Normal) -> list:
 # do a arp scan using nmap
 def TestArp(target, mode=ScanMode.Normal) -> list:
     nm = PortScanner()
+    nm3 = nmap3.NmapHostDiscovery()
+    hosts = []
     if isinstance(target, list):
         target = " ".join(target)
     if mode == ScanMode.Evade:
         nm.scan(hosts=target, arguments="-sn -PR -T 2 -f -g 53 --data-length 10")
     else:
-        nm.scan(hosts=target, arguments="-sn -PR")
+        resultofdiscovery = nm3.nmap_arp_discovery("192.168.15.17/24")
+        for key in resultofdiscovery.keys():
+            if is_ip(key) and resultofdiscovery[key]['state']['state'] == "up":
+                hosts.append(key)
+        #nm.scan(hosts=target, arguments="-sn -PR")
 
-    return nm.all_hosts()
+    return hosts
 
 
 # run a port scan on target using nmap
@@ -81,7 +94,7 @@ def PortScan(
     host_timeout=240,
     mode=ScanMode.Normal,
     customflags=""
-) -> PortScanner:
+) -> list:
 
     log.logger("info", f"Scanning {target} for open ports ...")
 
@@ -93,6 +106,8 @@ def PortScan(
                         "\' where idScan = " + str(idScan)
                         )
     nm = PortScanner()
+    nm3 = nmap3.Nmap()
+    targetinfo = []
     try:
         if is_root():
             if mode == ScanMode.Evade:
@@ -116,7 +131,9 @@ def PortScan(
                     ),
                 )
             else:
-                nm.scan(
+                print(target)
+                targetinfo = nm3.nmap_version_detection(target, args = "-O")
+                """nm.scan(
                     hosts=target,
                     arguments=" ".join(
                         [
@@ -131,7 +148,7 @@ def PortScan(
                             customflags,
                         ]
                     ),
-                )
+                )"""
         else:
             nm.scan(
                 hosts=target,
@@ -173,7 +190,7 @@ def PortScan(
                             datetime.fromtimestamp(insertDate + 30).strftime("%Y-%m-%d %H:%M:%S") +\
                             "\' where idScan = " + str(idScan)
                             )
-        return nm
+        return targetinfo
 
 
 def CreateNoise(target) -> None:
@@ -241,12 +258,12 @@ def DiscoverHosts(target, console, scantype=ScanType.ARP, mode=ScanMode.Normal) 
 
 def InitHostInfo(target_key) -> TargetInfo:
     try:
-        mac = target_key["addresses"]["mac"]
-    except (KeyError, IndexError):
+        mac = target_key["macaddress"]["addr"]
+    except (KeyError, IndexError, TypeError):
         mac = "Unknown"
 
     try:
-        vendor = target_key["vendor"][0]
+        vendor = target_key["osmatch"][0]["osclass"]["vendor"]
     except (KeyError, IndexError):
         vendor = "Unknown"
 
@@ -261,7 +278,7 @@ def InitHostInfo(target_key) -> TargetInfo:
         os_accuracy = "Unknown"
 
     try:
-        os_type = target_key["osmatch"][0]["osclass"][0]["type"]
+        os_type = target_key["osmatch"][0]["osclass"]["type"]
     except (KeyError, IndexError):
         os_type = "Unknown"
 
@@ -279,20 +296,32 @@ def InitPortInfo(port):
     service = "Unknown"
     product = "Unknown"
     version = "Unknown"
+    protocol = "Unknown"
+    cpe = "Unknown"
 
     if not len(port["state"]) == 0:
         state = port["state"]
 
-    if not len(port["name"]) == 0:
-        service = port["name"]
+    if not len(port["service"]["name"]) == 0:
+        service = port["service"]["name"]
 
-    if not len(port["product"]) == 0:
-        product = port["product"]
+    if "product" in port["service"] and len(port["service"]["product"]) != 0:
+        product = port["service"]["product"]
 
-    if not len(port["version"]) == 0:
-        version = port["version"]
+    if "version" in port["service"] and len(port["service"]["version"]) != 0:
+        version = port["service"]["version"]
+    
+    if not len(port["protocol"]) == 0:
+        protocol = port["protocol"]
 
-    return state, service, product, version
+    if len(port["cpe"]) != 0 and len(port["cpe"][0]["cpe"]) != 0: 
+        cpe = port["cpe"][0]["cpe"][5:]
+        if len(cpe.split(':')) == 3 and version != "Unknown":
+            cpe = cpe + ":" + version.split()[0]
+
+    print(state, service, product, version, protocol, cpe)
+
+    return state, service, product, version, protocol, cpe
 
 
 def AnalyseScanResults(nm, log, console, idScan, insertDate,  atomicInsert, ChClient, target=None) -> list:
@@ -319,12 +348,12 @@ def AnalyseScanResults(nm, log, console, idScan, insertDate,  atomicInsert, ChCl
     
 
     if is_root():
-        if nm[target]["status"]["reason"] in ["localhost-response", "user-set"]:
+        if nm[target]["state"]["reason"] in ["localhost-response", "user-set"]:
             log.logger("info", f"Target {target} seems to be us.")
     elif GetIpAdress() == target:
         log.logger("info", f"Target {target} seems to be us.")
 
-    if len(nm[target].all_tcp()) == 0:
+    if len(nm[target]['ports']) == 0:
         log.logger("warning", f"Target {target} seems to have no open ports.")
         return HostArray
 
@@ -341,7 +370,7 @@ def AnalyseScanResults(nm, log, console, idScan, insertDate,  atomicInsert, ChCl
     table.add_column("Product", style="red")
     table.add_column("Version", style="purple")
 
-    for port in nm[target]["tcp"].keys():
+    for port in nm[target]['ports']:
         if (time() - insertDate) > 30:
             insertDate = time()
             print("change time")
@@ -349,16 +378,17 @@ def AnalyseScanResults(nm, log, console, idScan, insertDate,  atomicInsert, ChCl
                             datetime.fromtimestamp(insertDate + 30).strftime("%Y-%m-%d %H:%M:%S") +\
                             "\' where idScan = " + str(idScan)
                             )
-        state, service, product, version = InitPortInfo(nm[target]["tcp"][port])
-        atomicInsert['ports'][str(port)] = {
+        state, service, product, version, protocol, cpe = InitPortInfo(port)
+        atomicInsert['ports'][str(port["portid"])] = {
             'cService': service,
             'cBanner': str(product),
-            'cVersion': version
+            'cVersion': version,
+            'cTransProto': protocol
         }
-        table.add_row(str(port), state, service, product, version)
+        table.add_row(str(port["portid"]), state, service, product, version)
 
         if state == "open":
-            HostArray.insert(len(HostArray), [target, port, service, product, version])
+            HostArray.insert(len(HostArray), [target, int(port["portid"]), service, product, version, cpe])
 
     console.print(table, justify="center")
 

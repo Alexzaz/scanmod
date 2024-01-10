@@ -17,17 +17,12 @@ class VulnerableSoftware:
     CVEs: list
 
 
-def GenerateKeyword(product: str, version: str, service: str):
-    if product.lower().rstrip() == "unknown":
-        product = ""
+def GenerateKeyword(cpe: str):
+    if cpe.lower().rstrip() == "unknown":
+        cpe = ""
 
-    if version.lower().rstrip() == "unknown":
-        version = ""
+    keyword = ""
 
-    if service.lower().rstrip() == "unknown":
-        service = ""
-
-    keyword = [""]
     dontsearch = [
         "ssh",
         "vnc",
@@ -44,24 +39,18 @@ def GenerateKeyword(product: str, version: str, service: str):
         "gnu classpath grmiregistry",
     ]
 
-    if product.lower() not in dontsearch and product != "":
-        keyword = [f"{product} {version}".rstrip(), f"{product}".rstrip()]
-    elif product == "" and version != "" and service not in dontsearch and service != "":
-        keyword = [f"{service} {version}".rstrip(), f"{service}".rstrip()]
-    elif product == "" and version == "" and service not in dontsearch and service != "":
-        keyword = [f"{service}".rstrip()]
+    if cpe.lower() not in dontsearch and cpe != "" and len(cpe.split(':')) == 4:
+        keyword = f"{cpe}".rstrip()
     return keyword
 
 
 def GenerateKeywords(PortArray: list) -> list:
     keywords = []
     for port in PortArray:
-        product = str(port[3])
-        version = str(port[4])
-        service =  str(port[2])
+        cpe = str(port[5])
 
-        keyword = GenerateKeyword(product, version, service)
-        if keyword[0] != "" and (keyword, str(port[1])) not in keywords:
+        keyword = GenerateKeyword(cpe)
+        if not keyword == "" and (keyword, str(port[1])) not in keywords:
             keywords.append((keyword, str(port[1])))
 
     return keywords
@@ -120,11 +109,7 @@ def SearchSploits(PortArray: list, log, console, console2, idScan, insertDate, a
                 "[white]Searching vulnerability database for[/white] "
                 + f"[red]{keyword}[/red] [white]...[/white]"
             )
-            for value in keyword[0]:
-                if value != "":
-                    ApiResponseCVE = SearchKeyword(keyword, log, apiKey)
-                else:
-                    ApiResponseCVE = []
+            ApiResponseCVE = SearchKeyword(keyword, log, apiKey)
             if (time() - insertDate) > 30:
                 insertDate = time()
                 print("change time")
@@ -140,7 +125,7 @@ def SearchSploits(PortArray: list, log, console, console2, idScan, insertDate, a
                 banner(f"Possible vulnerabilities for {target}", "red", console)
                 printed_banner = True
 
-            #console.print(f"┌─ [yellow][ {keyword} ][/yellow]")
+            console.print(f"┌─ [yellow][ {keyword} ][/yellow]")
 
             CVEs = []
             count_ = 0
@@ -154,7 +139,7 @@ def SearchSploits(PortArray: list, log, console, console2, idScan, insertDate, a
                                         "\' where idScan = " + str(idScan)
                                         )
                     CVEs.append(CVE.CVEID)
-                    #console.print(f"│\n├─────┤ [red]{CVE.CVEID}[/red]\n│")
+                    console.print(f"│\n├─────┤ [red]{CVE.CVEID}[/red]\n│")
                     CVEalreadyInTable = ChClient.query(
                         "select cCVEId from tScanCVE where cCVEId = \'" + CVE.CVEID + "\'",\
                         query_formats = {'String': 'string'})
@@ -189,17 +174,17 @@ def SearchSploits(PortArray: list, log, console, console2, idScan, insertDate, a
                     
 
                     wrapped_description = wrap(CVE.description, term_width - 50)
-                    #console.print(f"│\t\t[cyan]Description: [/cyan]")
-                    #for line in wrapped_description:
-                        #console.print(f"│\t\t\t{line}")
-                    #console.print(
-                        #f"│\t\t[cyan]Severity: [/cyan]{CVE.severity}\n"
-                    #)
+                    console.print(f"│\t\t[cyan]Description: [/cyan]")
+                    for line in wrapped_description:
+                        console.print(f"│\t\t\t{line}")
+                    console.print(
+                        f"│\t\t[cyan]Severity: [/cyan]{CVE.severity}\n"
+                    )
                     count_ += 1
 
             VulnObject = VulnerableSoftware(title=keyword, CVEs=CVEs)
             VulnsArray.append(VulnObject)
             countPort += 1
-            #console.print("└" + "─" * (term_width - 1))
+            console.print("└" + "─" * (term_width - 1))
 
     return VulnsArray
