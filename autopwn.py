@@ -173,7 +173,7 @@ def StartScanning(
                                     'String',\
                                     'UInt16'
                                 ]
-            if ScanVulns and len(PortArray) > 0:
+            """if ScanVulns and len(PortArray) > 0:
                 VulnsArray = SearchSploits(PortArray, log, console, console2, idScan, insertDate, atomicInsert, ChClient, apiKey)
                 #if DownloadExploits and len(VulnsArray) > 0:
                     #GetExploitsFromArray(VulnsArray, log, console, console2, host)
@@ -196,7 +196,7 @@ def StartScanning(
                         '',\
                         0
                     ]
-                    dataInsert.append(addingCve)
+                    dataInsert.append(addingCve)"""
             ChClient.insert(\
                 table="tScanData",\
                 data = dataInsert,\
