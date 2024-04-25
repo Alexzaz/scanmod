@@ -1,0 +1,12 @@
+{
+    "dbaddr" : "127.0.0.1",
+    "dbname" : "stet",
+    "dbport" : 8123,
+    "dbinterface" : "http",
+    "dbclient" : "SCANNER",
+    "loglevel" : 3,
+    "shedulescan" : "* 4 10, * 23 0",
+    "timezone" : "+3",
+    "hostlist" : "192.168.15.1; 192.168.15.2-200",
+    "nmapflags" : []
+    } 

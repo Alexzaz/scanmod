@@ -22,6 +22,9 @@ from rich.text import Text
 from modules.report import ReportMail, ReportType
 
 
+import json
+
+
 class ScanMode(Enum):
     Normal = 0
     Noise = 1
@@ -35,222 +38,295 @@ class ScanType(Enum):
 
 def cli():
     argparser = ArgumentParser(
-        description="AutoPWN Suite | A project for scanning "
+        description = "AutoPWN Suite | A project for scanning "
         + "vulnerabilities and exploiting systems automatically."
     )
     argparser.add_argument(
-        "-v", "--version", help="Print version and exit.", action="store_true"
+        "-v", "--version", help = "Print version and exit.", action = "store_true"
     )
     argparser.add_argument(
         "-y",
         "--yes-please",
-        help="Don't ask for anything. (Full automatic mode)",
-        action="store_true",
-        required=False,
-        default=False,
+        help = "Don't ask for anything. (Full automatic mode)",
+        action = "store_true",
+        required = False,
+        default = True,
     )
     argparser.add_argument(
         "-c",
         "--config",
-        help="Specify a config file to use. (Default : None)",
-        default=None,
-        required=False,
-        metavar="CONFIG",
-        type=str,
+        help = "Specify a config file to use. (Default : None)",
+        default = None,
+        required = False,
+        metavar = "CONFIG",
+        type = str,
     )
     argparser.add_argument(
         "-nc",
         "--no-color",
-        help="Disable colors.",
-        default=False,
-        required=False,
-        action="store_true",
+        help = "Disable colors.",
+        default = False,
+        required = False,
+        action = "store_true",
+    )
+
+    argparser.add_argument(
+        "-ss",
+        "--shedulescan",
+        help = "Shedule of scans",
+        default = "* 4 10, * 23 0",
+        required = False,
+        type = str
+    )
+
+    argparser.add_argument(
+        "-tz",
+        "--timezone",
+        help = "Specify a timezone for scanner",
+        default = "+3",
+        required = False,
+        type = str
+    )
+
+    argparser.add_argument(
+        "-ll",
+        "--loglevel",
+        help = "Loglevel of service.\n1 - ERROR\n2 - WARNING\n3 - INFO\n4 - DEBUG",
+        default = 4,
+        type = int,
+        required = False
     )
 
     scanargs = argparser.add_argument_group("Scanning", "Options for scanning")
     scanargs.add_argument(
         "-t",
         "--target",
-        help=(
+        help = (
             "Target range to scan. This argument overwrites the"
             + " hostfile argument. (192.168.0.1 or 192.168.0.0/24)"
         ),
-        type=str,
-        required=False,
-        default=None,
+        type = str,
+        required = False,
+        default = None,
     )
     scanargs.add_argument(
-        "-hf",
-        "--host-file",
-        help="File containing a list of hosts to scan.",
-        type=str,
-        required=False,
-        default=None,
+        "-hl",
+        "--host-list",
+        help = "Containing a list of hosts to scan.",
+        type = str,
+        required = False,
+        default = "",
     )
     scanargs.add_argument(
         "-sd",
         "--skip-discovery",
-        help="Skips the host discovery phase.",
-        required=False,
-        default=False,
-        action="store_true",
+        help = "Skips the host discovery phase.",
+        required = False,
+        default = False,
+        action = "store_true",
     )
     scanargs.add_argument(
         "-st",
         "--scan-type",
-        help="Scan type.",
-        type=str,
-        required=False,
-        default=None,
-        choices=["arp", "ping"],
+        help = "Scan type.",
+        type = str,
+        required = False,
+        default = None,
+        choices = ["arp", "ping"],
     )
     scanargs.add_argument(
         "-nf",
         "--nmap-flags",
-        help=(
+        help = (
             "Custom nmap flags to use for portscan."
-            + ' (Has to be specified like : -nf="-O")'
+            + ' (Has to be specified like : -nf = "-O")'
         ),
-        default="",
-        type=str,
-        required=False,
+        default = "",
+        type = str,
+        required = False,
     )
     scanargs.add_argument(
         "-s",
         "--speed",
-        help="Scan speed. (Default : 3)",
-        default=3,
-        type=int,
-        required=False,
-        choices=range(0, 6),
+        help = "Scan speed. (Default : 3)",
+        default = 3,
+        type = int,
+        required = False,
+        choices = range(0, 6),
     )
     scanargs.add_argument(
         "-ht",
         "--host-timeout",
-        help="Timeout for every host. (Default :240)",
-        default=240,
-        type=int,
-        required=False,
+        help = "Timeout for every host. (Default :240)",
+        default = 240,
+        type = int,
+        required = False,
     )
     scanargs.add_argument(
         "-a",
         "--api",
-        help=(
+        help = (
             "Specify API key for vulnerability detection "
             + "for faster scanning. (Default : None)"
         ),
-        default=None,
-        type=str,
-        required=False,
+        default = None,
+        type = str,
+        required = False,
     )
     scanargs.add_argument(
         "-m",
         "--mode",
-        help="Scan mode.",
-        default="normal",
-        type=str,
-        required=False,
-        choices=["evade", "noise", "normal"],
+        help = "Scan mode.",
+        default = "normal",
+        type = str,
+        required = False,
+        choices = ["evade", "noise", "normal"],
     )
     scanargs.add_argument(
         "-nt",
         "--noise-timeout",
-        help="Noise mode timeout.",
-        default=None,
-        type=int,
-        required=False,
-        metavar="TIMEOUT",
+        help = "Noise mode timeout.",
+        default = None,
+        type = int,
+        required = False,
+        metavar = "TIMEOUT",
+    )
+
+    dbargs = argparser.add_argument_group("Database", "Options for database")
+    dbargs.add_argument(
+        "-dba",
+        "--databaseaddress",
+        help = "IP-address of database's server",
+        default = "127.0.0.1",
+        type = str,
+        required = False
+    )
+
+    dbargs.add_argument(
+        "-dbn",
+        "--databasename",
+        help = "Name of database",
+        default = "stet",
+        type = str,
+        required = False
+    )
+
+    dbargs.add_argument(
+        "-dbp",
+        "--databaseport",
+        help = "Port of database's server",
+        default = 8123,
+        type = int,
+        required = False
+    )
+
+    dbargs.add_argument(
+        "-dbi",
+        "--databaseinterface",
+        help = "Interface of database's server",
+        default = "http",
+        type = str,
+        required = False
+    )
+
+    dbargs.add_argument(
+        "-dbu",
+        "--databaseuser",
+        help = "User of database",
+        default = "SCANNER",
+        type = str,
+        required = False
     )
 
     reportargs = argparser.add_argument_group("Reporting", "Options for reporting")
     reportargs.add_argument(
         "-o",
         "--output",
-        help="Output file name. (Default : autopwn.log)",
-        default="autopwn",
-        type=str,
-        required=False,
+        help = "Output file name. (Default : autopwn.log)",
+        default = "autopwn",
+        type = str,
+        required = False,
     )
     reportargs.add_argument(
         "-ot",
         "--output-type",
-        help="Output file type. (Default : html)",
-        default="html",
-        type=str,
-        required=False,
-        choices=["html", "txt", "svg"],
+        help = "Output file type. (Default : html)",
+        default = "html",
+        type = str,
+        required = False,
+        choices = ["html", "txt", "svg"],
     )
     reportargs.add_argument(
         "-rp",
         "--report",
-        help="Report sending method.",
-        type=str,
-        required=False,
-        default=None,
-        choices=["email", "webhook"],
+        help = "Report sending method.",
+        type = str,
+        required = False,
+        default = None,
+        choices = ["email", "webhook"],
     )
     reportargs.add_argument(
         "-rpe",
         "--report-email",
-        help="Email address to use for sending report.",
-        type=str,
-        required=False,
-        default=None,
-        metavar="EMAIL",
+        help = "Email address to use for sending report.",
+        type = str,
+        required = False,
+        default = None,
+        metavar = "EMAIL",
     )
     reportargs.add_argument(
         "-rpep",
         "--report-email-password",
-        help="Password of the email report is going to be sent from.",
-        type=str,
-        required=False,
-        default=None,
-        metavar="PASSWORD",
+        help = "Password of the email report is going to be sent from.",
+        type = str,
+        required = False,
+        default = None,
+        metavar = "PASSWORD",
     )
     reportargs.add_argument(
         "-rpet",
         "--report-email-to",
-        help="Email address to send report to.",
-        type=str,
-        required=False,
-        default=None,
-        metavar="EMAIL",
+        help = "Email address to send report to.",
+        type = str,
+        required = False,
+        default = None,
+        metavar = "EMAIL",
     )
     reportargs.add_argument(
         "-rpef",
         "--report-email-from",
-        help="Email to send from.",
-        type=str,
-        required=False,
-        default=None,
-        metavar="EMAIL",
+        help = "Email to send from.",
+        type = str,
+        required = False,
+        default = None,
+        metavar = "EMAIL",
     )
     reportargs.add_argument(
         "-rpes",
         "--report-email-server",
-        help="Email server to use for sending report.",
-        type=str,
-        required=False,
-        default=None,
-        metavar="SERVER",
+        help = "Email server to use for sending report.",
+        type = str,
+        required = False,
+        default = None,
+        metavar = "SERVER",
     )
     reportargs.add_argument(
         "-rpesp",
         "--report-email-server-port",
-        help="Port of the email server.",
-        type=int,
-        required=False,
-        default=None,
-        metavar="PORT",
+        help = "Port of the email server.",
+        type = int,
+        required = False,
+        default = None,
+        metavar = "PORT",
     )
     reportargs.add_argument(
         "-rpw",
         "--report-webhook",
-        help="Webhook to use for sending report.",
-        type=str,
-        required=False,
-        default=None,
-        metavar="WEBHOOK",
+        help = "Webhook to use for sending report.",
+        type = str,
+        required = False,
+        default = None,
+        metavar = "WEBHOOK",
     )
 
     return argparser.parse_args()
@@ -297,7 +373,7 @@ def DetectIPRange() -> str:
     }
     ip = GetIpAdress()
     if system().lower() == "windows":
-        proc = Popen("ipconfig", stdout=PIPE)
+        proc = Popen("ipconfig", stdout = PIPE)
         while True:
             line = proc.stdout.readline()
             if ip.encode() in line:
@@ -307,7 +383,7 @@ def DetectIPRange() -> str:
         )
         net_range = f"{ip}/{net_dict[mask]}"
     else:
-        proc = Popen(["ip", "-o", "-f", "inet", "addr", "show"], stdout=PIPE)
+        proc = Popen(["ip", "-o", "-f", "inet", "addr", "show"], stdout = PIPE)
         regex = f"\\b{ip}\/\\b([0-9]|[12][0-9]|3[0-2])\\b"
         cmd_output = proc.stdout.read().decode()
         net_range = search(regex, cmd_output).group()
@@ -329,7 +405,7 @@ def InitArgsAPI(args, log) -> str:
     else:
         apiKey = None
         try:
-            with open("api.txt", "r", encoding="utf-8") as f:
+            with open("api.txt", "r", encoding = "utf-8") as f:
                 apiKey = f.readline().strip("\n")
         except FileNotFoundError:
             log.logger(
@@ -364,38 +440,11 @@ def InitArgsScanType(args, log) -> ScanType:
 
 
 def InitArgsTarget(args, log):
-    if args.target:
-        target = args.target
-    else:
-        if args.host_file:
-            # read targets from host file and insert all of them into an array
-            try:
-                with open(args.host_file, "r", encoding="utf-8") as target_file:
-                    target = target_file.read().splitlines()
-            except FileNotFoundError:
-                log.logger("error", "Host file not found!")
-            except PermissionError:
-                log.logger("error", "Permission denied while trying to read host file!")
-            except Exception:
-                log.logger("error", "Unknown error while trying to read host file!")
-            else:
-                return target
-
-            target = DetectIPRange()
-        else:
-            if DontAskForConfirmation:
-                try:
-                    target = DetectIPRange()
-                    print(target)
-                except Exception as e:
-                    log.logger("error", e)
-                    target = input("Enter target range to scan : ")
-            else:
-                try:
-                    target = input("Enter target range to scan : ")
-                except KeyboardInterrupt:
-                    raise SystemExit("Ctrl+C pressed. Exiting.")
-
+    target = []
+    if args.host_list != "":
+        elements = args.host_list.split(";")
+        for value in elements:
+            target.append(value.strip())
     return target
 
 
@@ -522,7 +571,7 @@ def GetHostsToScan(hosts, console) -> list:
     if len(hosts) == 0:
         raise SystemExit(
             "No hosts found! {time} - Scan completed.".format(
-                time=datetime.now().strftime("%b %d %Y %H:%M:%S")
+                time = datetime.now().strftime("%b %d %Y %H:%M:%S")
             )
         )
 
@@ -533,7 +582,7 @@ def GetHostsToScan(hosts, console) -> list:
 
         msg = Text.assemble(("[", "red"), (str(index), "cyan"), ("] ", "red"), host)
 
-        console.print(msg, justify="center")
+        #console.print(msg, justify = "center")
 
         index += 1
 
@@ -559,7 +608,7 @@ def GetHostsToScan(hosts, console) -> list:
             elif host == "exit":
                 raise SystemExit(
                     "{time} - Scan completed.".format(
-                        time=datetime.now().strftime("%b %d %Y %H:%M:%S")
+                        time = datetime.now().strftime("%b %d %Y %H:%M:%S")
                     )
                 )
             else:
@@ -569,7 +618,7 @@ def GetHostsToScan(hosts, console) -> list:
                 else:
                     """need rework console.print(
                         "Please enter a valid host number or 'all' " + "or 'exit'",
-                        style="red",
+                        style = "red",
                     )"""
 
     return Targets
@@ -580,69 +629,41 @@ def InitArgsConf(args, log) -> None:
         return
 
     try:
-        config = ConfigParser()
-        config.read(args.config)
+        #print("read config")
+        with open(args.config, "r") as configfile:
+            config = json.load(configfile)
 
-        if config.has_option("AUTOPWN", "target"):
-            args.target = config.get("AUTOPWN", "target").lower()
+            if "dbname" in config:
+                args.databasename = config["dbname"]
 
-        if config.has_option("AUTOPWN", "hostfile"):
-            args.host_file = config.get("AUTOPWN", "hostfile").lower()
+            if "dbaddr" in config:
+                args.databaseaddress = config["dbaddr"]
 
-        if config.has_option("AUTOPWN", "scantype"):
-            args.scan_type = config.get("AUTOPWN", "scantype").lower()
+            if "dbport" in config:
+                args.databaseport = config["dbport"]
 
-        if config.has_option("AUTOPWN", "nmapflags"):
-            args.nmap_flags = config.get("AUTOPWN", "nmapflags").lower()
+            if "dbinterface" in config:
+                args.databaseinterface = config["dbinterface"]
 
-        if config.has_option("AUTOPWN", "speed"):
-            try:
-                args.speed = int(config.get("AUTOPWN", "speed"))
-            except ValueError:
-                log.logger("error", "Invalid speed value in config file. (Default : 3)")
+            if "dbclient" in config:
+                args.databaseuser = config["dbclient"]
 
-        if config.has_option("AUTOPWN", "apikey"):
-            args.api = config.get("AUTOPWN", "apikey").lower()
+            if "loglevel" in config:
+                args.loglevel = config["loglevel"]
 
-        if config.has_option("AUTOPWN", "auto"):
-            args.yes_please = True
+            if "shedulescan" in config:
+                args.shedulescan = config["shedulescan"].strip()
+                #print (args.shedulescan)
 
-        if config.has_option("AUTOPWN", "mode"):
-            args.mode = config.get("AUTOPWN", "mode").lower()
+            if "timezone" in config:
+                args.timezone = config["timezone"].strip()
 
-        if config.has_option("AUTOPWN", "noisetimeout"):
-            args.noise_timeout = config.get("AUTOPWN", "noisetimeout").lower()
+            if "hostlist" in config:
+                args.host_list = config["hostlist"].strip()
 
-        if config.has_option("REPORT", "output"):
-            args.output = config.get("REPORT", "output").lower()
-
-        if config.has_option("REPORT", "outputtype"):
-            args.output_type = config.get("REPORT", "outputtype").lower()
-
-        if config.has_option("REPORT", "method"):
-            args.report = config.get("REPORT", "method").lower()
-
-        if config.has_option("REPORT", "email"):
-            args.report_email = config.get("REPORT", "email").lower()
-
-        if config.has_option("REPORT", "email_password"):
-            args.report_email_password = config.get("REPORT", "email_password").lower()
-
-        if config.has_option("REPORT", "email_to"):
-            args.report_email_to = config.get("REPORT", "email_to").lower()
-
-        if config.has_option("REPORT", "email_from"):
-            args.report_email_from = config.get("REPORT", "email_from").lower()
-
-        if config.has_option("REPORT", "email_server"):
-            args.report_email_server = config.get("REPORT", "email_server").lower()
-
-        if config.has_option("REPORT", "email_port"):
-            args.report_email_server_port = config.get("REPORT", "email_port").lower()
-
-        if config.has_option("REPORT", "webhook"):
-            args.report_webhook = config.get("REPORT", "webhook")
-
+            if "nmapflags" in config:
+                for _ in config["nmapflags"]:
+                    args.nmap_flags = args.nmap_flags + " " + _
     except FileNotFoundError:
         log.logger("error", "Config file not found!")
         raise SystemExit
@@ -665,29 +686,29 @@ def install_nmap_linux(log) -> None:
             ]:
                 check_call(
                     ["/usr/bin/sudo", "apt-get", "install", "nmap", "-y"],
-                    stderr=DEVNULL,
+                    stderr = DEVNULL,
                 )
                 break
             elif distro_ in ["arch", "manjaro"]:
                 check_call(
                     ["/usr/bin/sudo", "pacman", "-S", "nmap", "--noconfirm"],
-                    stderr=DEVNULL,
+                    stderr = DEVNULL,
                 )
                 break
             elif distro_ in ["fedora", "oracle"]:
                 check_call(
-                    ["/usr/bin/sudo", "dnf", "install", "nmap", "-y"], stderr=DEVNULL
+                    ["/usr/bin/sudo", "dnf", "install", "nmap", "-y"], stderr = DEVNULL
                 )
                 break
             elif distro in ["rhel", "centos"]:
                 check_call(
-                    ["/usr/bin/sudo", "yum", "install", "nmap", "-y"], stderr=DEVNULL
+                    ["/usr/bin/sudo", "yum", "install", "nmap", "-y"], stderr = DEVNULL
                 )
                 break
             elif distro in ["sles", "opensuse"]:
                 check_call(
                     ["/usr/bin/sudo", "zypper", "install", "nmap", "--non-interactive"],
-                    stderr=DEVNULL,
+                    stderr = DEVNULL,
                 )
                 break
             else:
@@ -729,7 +750,7 @@ def install_nmap_windows(log) -> None:
                 "nmap",
                 "--silent",
             ],
-            stderr=DEVNULL,
+            stderr = DEVNULL,
         )
         log.logger("warning", "Nmap is installed but shell restart is required.")
         raise SystemExit
@@ -740,14 +761,14 @@ def install_nmap_windows(log) -> None:
 
 def install_nmap_mac(log) -> None:
     try:
-        check_call(["/usr/bin/sudo", "brew", "install", "nmap"], stderr=DEVNULL)
+        check_call(["/usr/bin/sudo", "brew", "install", "nmap"], stderr = DEVNULL)
     except CalledProcessError:
         log.logger("error", "Couldn't install nmap! (Mac)")
 
 
 def check_nmap(log) -> None:
     try:
-        check_call(["nmap", "-h"], stdout=DEVNULL, stderr=DEVNULL)
+        check_call(["nmap", "-h"], stdout = DEVNULL, stderr = DEVNULL)
     except (CalledProcessError, FileNotFoundError):
         log.logger("warning", "Nmap is not installed.")
         if DontAskForConfirmation:
@@ -804,8 +825,8 @@ def ParamPrint(
     if args.skip_discovery:
         msg += f"│\tSkip discovery: True\n"
 
-    if args.host_file:
-        msg += f"│\tHostfile: {args.host_file}\n"
+    if args.host_list:
+        msg += f"│\tHostfile: {args.host_list}\n"
 
     if not args.host_timeout == 240:
         msg += f"│\tHost timeout: {args.host_timeout}\n"
@@ -832,7 +853,7 @@ def ParamPrint(
 
     msg += "└" + "─" * (term_width - 1)
 
-    console.print(msg)
+    #console.print(msg)
 
 
 def CheckConnection(log) -> bool:
@@ -866,7 +887,7 @@ def get_terminal_width() -> int:
         width = 80
 
     if system().lower() == "windows":
-        width -= 1
+        width-= 1
 
     return width
 

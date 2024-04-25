@@ -11,7 +11,7 @@ from rich import box
 from rich.table import Table
 
 from modules.logger import banner
-from modules.utils import GetIpAdress, ScanMode, ScanType, is_root
+from modules.utils import GetIpAdress, ScanMode, ScanType, is_root, DetectIPRange
 
 """modify ADD CONNECT TO CH"""
 #import clickhouse_connect as ChConnect
@@ -74,7 +74,7 @@ def TestArp(target, mode=ScanMode.Normal) -> list:
     if mode == ScanMode.Evade:
         nm.scan(hosts=target, arguments="-sn -PR -T 2 -f -g 53 --data-length 10")
     else:
-        resultofdiscovery = nm3.nmap_arp_discovery("192.168.15.17/24")
+        resultofdiscovery = nm3.nmap_arp_discovery(target, args = "-sn")
         for key in resultofdiscovery.keys():
             if is_ip(key) and resultofdiscovery[key]['state']['state'] == "up":
                 hosts.append(key)
@@ -100,7 +100,7 @@ def PortScan(
 
     if (time() - insertDate) > 30:
         insertDate = time()
-        print("change time")
+        #print("change time")
         ChClient.command("alter table stet.tScanHistory update dtEndTime = \'" +\
                         datetime.fromtimestamp(insertDate + 30).strftime("%Y-%m-%d %H:%M:%S") +\
                         "\' where idScan = " + str(idScan)
@@ -131,8 +131,8 @@ def PortScan(
                     ),
                 )
             else:
-                print(target)
-                targetinfo = nm3.nmap_version_detection(target, args = "-O")
+                #print(target)
+                targetinfo = nm3.nmap_version_detection(target, args = "-O -p-")
                 """nm.scan(
                     hosts=target,
                     arguments=" ".join(
@@ -166,7 +166,7 @@ def PortScan(
             )
         if (time() - insertDate) > 30:
             insertDate = time()
-            print("change time")
+            #print("change time")
             ChClient.command("alter table stet.tScanHistory update dtEndTime = \'" +\
                             datetime.fromtimestamp(insertDate + 30).strftime("%Y-%m-%d %H:%M:%S") +\
                             "\' where idScan = " + str(idScan)
@@ -174,7 +174,7 @@ def PortScan(
     except Exception as e:
         if (time() - insertDate) > 30:
             insertDate = time()
-            print("change time")
+            #print("change time")
             ChClient.command("alter table stet.tScanHistory update dtEndTime = \'" +\
                             datetime.fromtimestamp(insertDate + 30).strftime("%Y-%m-%d %H:%M:%S") +\
                             "\', nStatus = " + '2' +\
@@ -185,7 +185,7 @@ def PortScan(
     else:
         if (time() - insertDate) > 30:
             insertDate = time()
-            print("change time")
+            #print("change time")
             ChClient.command("alter table stet.tScanHistory update dtEndTime = \'" +\
                             datetime.fromtimestamp(insertDate + 30).strftime("%Y-%m-%d %H:%M:%S") +\
                             "\' where idScan = " + str(idScan)
@@ -239,14 +239,18 @@ def NoiseScan(target, log, console, scantype=ScanType.ARP, noisetimeout=None) ->
 
 
 def DiscoverHosts(target, console, scantype=ScanType.ARP, mode=ScanMode.Normal) -> list:
-    if isinstance(target, list):
+    """if isinstance(target, list):
         banner(
             f"Scanning {len(target)} target(s) using {scantype.name} scan ...",
             "green",
             console,
         )
+
     else:
-        banner(f"Scanning {target} using {scantype.name} scan ...", "green", console)
+        banner(f"Scanning {target} using {scantype.name} scan ...", "green", console)"""
+    if target.find("/") == -1:
+        target = DetectIPRange()
+
 
     if scantype == ScanType.ARP:
         OnlineHosts = TestArp(target, mode)
@@ -319,7 +323,7 @@ def InitPortInfo(port):
         if len(cpe.split(':')) == 3 and version != "Unknown":
             cpe = cpe + ":" + version.split()[0]
 
-    print(state, service, product, version, protocol, cpe)
+    #print(state, service, product, version, protocol, cpe)
 
     return state, service, product, version, protocol, cpe
 
@@ -357,10 +361,10 @@ def AnalyseScanResults(nm, log, console, idScan, insertDate,  atomicInsert, ChCl
         log.logger("warning", f"Target {target} seems to have no open ports.")
         return HostArray
 
-    banner(f"Portscan results for {target}", "green", console)
+    #banner(f"Portscan results for {target}", "green", console)
 
-    if not CurrentTargetInfo.mac == "Unknown" and not CurrentTargetInfo.os == "Unknown":
-        console.print(CurrentTargetInfo.colored(), justify="center")
+    #if not CurrentTargetInfo.mac == "Unknown" and not CurrentTargetInfo.os == "Unknown":
+        #console.print(CurrentTargetInfo.colored(), justify="center")
 
     table = Table(box=box.MINIMAL)
 
@@ -371,13 +375,6 @@ def AnalyseScanResults(nm, log, console, idScan, insertDate,  atomicInsert, ChCl
     table.add_column("Version", style="purple")
 
     for port in nm[target]['ports']:
-        if (time() - insertDate) > 30:
-            insertDate = time()
-            print("change time")
-            ChClient.command("alter table stet.tScanHistory update dtEndTime = \'" +\
-                            datetime.fromtimestamp(insertDate + 30).strftime("%Y-%m-%d %H:%M:%S") +\
-                            "\' where idScan = " + str(idScan)
-                            )
         state, service, product, version, protocol, cpe = InitPortInfo(port)
         atomicInsert['ports'][str(port["portid"])] = {
             'cService': service,
@@ -390,6 +387,6 @@ def AnalyseScanResults(nm, log, console, idScan, insertDate,  atomicInsert, ChCl
         if state == "open":
             HostArray.insert(len(HostArray), [target, int(port["portid"]), service, product, version, cpe])
 
-    console.print(table, justify="center")
+    #console.print(table, justify="center")
 
     return HostArray

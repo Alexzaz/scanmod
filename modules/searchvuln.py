@@ -89,14 +89,14 @@ def SearchSploits(PortArray: list, log, console, console2, idScan, insertDate, a
         "info", f"Searching vulnerability database for {len(keywords)} keyword(s) ..."
     )
 
-    print(keywords)
+    #print(keywords)
 
-    printed_banner = False
+    #printed_banner = False
     with console2.status(
         "[white]Searching vulnerabilities ...[/white]", spinner="bouncingBar"
     ) as status:
         for keyword in keywords:
-            print(keyword)
+            #print(keyword)
             if (time() - insertDate) > 30:
                 insertDate = time()
                 print("change time")
@@ -104,15 +104,15 @@ def SearchSploits(PortArray: list, log, console, console2, idScan, insertDate, a
                                 datetime.fromtimestamp(insertDate + 30).strftime("%Y-%m-%d %H:%M:%S") +\
                                 "\' where idScan = " + str(idScan)
                                 )
-            status.start()
-            status.update(
+            #status.start()
+            """status.update(
                 "[white]Searching vulnerability database for[/white] "
                 + f"[red]{keyword}[/red] [white]...[/white]"
-            )
+            )"""
             ApiResponseCVE = SearchKeyword(keyword, log, apiKey)
             if (time() - insertDate) > 30:
                 insertDate = time()
-                print("change time")
+                #print("change time")
                 ChClient.command("alter table stet.tScanHistory update dtEndTime = \'" +\
                                 datetime.fromtimestamp(insertDate + 30).strftime("%Y-%m-%d %H:%M:%S") +\
                                 "\' where idScan = " + str(idScan)
@@ -121,11 +121,11 @@ def SearchSploits(PortArray: list, log, console, console2, idScan, insertDate, a
             if len(ApiResponseCVE) == 0:
                 continue
 
-            if not printed_banner:
+            """if not printed_banner:
                 banner(f"Possible vulnerabilities for {target}", "red", console)
-                printed_banner = True
+                printed_banner = True"""
 
-            console.print(f"┌─ [yellow][ {keyword} ][/yellow]")
+            #console.print(f"┌─ [yellow][ {keyword} ][/yellow]")
 
             CVEs = []
             count_ = 0
@@ -133,13 +133,13 @@ def SearchSploits(PortArray: list, log, console, console2, idScan, insertDate, a
                 if count_ < 2000:
                     if (time() - insertDate) > 30:
                         insertDate = time()
-                        print("change time")
+                        #print("change time")
                         ChClient.command("alter table stet.tScanHistory update dtEndTime = \'" +\
                                         datetime.fromtimestamp(insertDate + 30).strftime("%Y-%m-%d %H:%M:%S") +\
                                         "\' where idScan = " + str(idScan)
                                         )
                     CVEs.append(CVE.CVEID)
-                    console.print(f"│\n├─────┤ [red]{CVE.CVEID}[/red]\n│")
+                    #console.print(f"│\n├─────┤ [red]{CVE.CVEID}[/red]\n│")
                     CVEalreadyInTable = ChClient.query(
                         "select cCVEId from tScanCVE where cCVEId = \'" + CVE.CVEID + "\'",\
                         query_formats = {'String': 'string'})
@@ -174,17 +174,17 @@ def SearchSploits(PortArray: list, log, console, console2, idScan, insertDate, a
                     
 
                     wrapped_description = wrap(CVE.description, term_width - 50)
-                    console.print(f"│\t\t[cyan]Description: [/cyan]")
-                    for line in wrapped_description:
-                        console.print(f"│\t\t\t{line}")
-                    console.print(
+                    #console.print(f"│\t\t[cyan]Description: [/cyan]")
+                    #for line in wrapped_description:
+                        #console.print(f"│\t\t\t{line}")
+                    """console.print(
                         f"│\t\t[cyan]Severity: [/cyan]{CVE.severity}\n"
-                    )
+                    )"""
                     count_ += 1
 
             VulnObject = VulnerableSoftware(title=keyword, CVEs=CVEs)
             VulnsArray.append(VulnObject)
             countPort += 1
-            console.print("└" + "─" * (term_width - 1))
+            #console.print("└" + "─" * (term_width - 1))
 
     return VulnsArray

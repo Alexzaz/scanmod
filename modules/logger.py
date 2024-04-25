@@ -9,9 +9,9 @@ from modules.utils import get_terminal_width
 def banner(msg, color, console) -> None:
     term_width = get_terminal_width()
 
-    need rework console.print("─" * term_width, style=color)
-    need rework console.print(Text(msg), justify="center", style=color)
-    need rework console.print("─" * term_width, style=color)
+    #need rework console.print("─" * term_width, style=color)
+    #need rework console.print(Text(msg), justify="center", style=color)
+    #need rework console.print("─" * term_width, style=color)
 
 
 class Logger:
@@ -19,15 +19,14 @@ class Logger:
     Custom logger
     """
 
-    def __init__(self, console) -> None:
+    def __init__(self) -> None:
         logging.basicConfig(
             format="%(message)s",
             level=logging.INFO,
             datefmt="[%X]",
-            handlers=[RichHandler(console=console)],
+            filename="/home/alexzaz/stet_scan.log",
+            filemode="w"
         )
-
-        RichHandler.KEYWORDS = ["[+]", "[-]", "[*]"]
 
         self.log: object = logging.getLogger("rich")
 

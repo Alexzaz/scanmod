@@ -75,7 +75,7 @@ def searchCVE(keyword: tuple, log, apiKey=None) -> list:
         try:
             sleep(sleep_time)
             paramaters = {"cpeName": "cpe:2.3:" + keyword[0] + ":*:*:*:*:*:*:*"}
-            print("cpe:2.3:" + keyword[0] + ":*:*:*:*:*:*:*")
+            #print("cpe:2.3:" + keyword[0] + ":*:*:*:*:*:*:*")
             request = get(url, headers=headers, params=paramaters)
             data = request.json()
         except Exception as e:
